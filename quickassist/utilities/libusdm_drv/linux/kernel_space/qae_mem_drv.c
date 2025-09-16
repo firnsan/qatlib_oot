@@ -862,6 +862,7 @@ dev_get_user_page(struct file *fp, uint32_t cmd, unsigned long arg)
     {
        if (PageHuge(page))
        {
+           /*
            if (user_mem_info.size != PMD_SIZE)
            {
                mm_err("%s:%d dev_get_user_page: user_mem_info.size is not "
@@ -872,6 +873,7 @@ dev_get_user_page(struct file *fp, uint32_t cmd, unsigned long arg)
                put_page(page);
                return -EINVAL;
            }
+           */
 
            ret = hugepage_iommu_map_and_store_phy_addr(
                &phy_addr, page, user_mem_info.size, list);
