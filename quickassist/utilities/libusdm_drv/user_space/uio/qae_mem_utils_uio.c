@@ -87,7 +87,7 @@
 **************************************************************************/
 int g_fd = -1;
 #ifndef ICP_THREAD_SPECIFIC_USDM
-int g_strict_node = 1;
+int g_strict_node = 0;
 #endif
 
 /**************************************************************************
@@ -252,6 +252,12 @@ static inline void *mem_protect(void *const addr, const size_t len)
     ret = qae_madvise(addr, len, MADV_DONTFORK);
     if (0 != ret)
     {
+        CMD_ERROR("%s:%d madvise failed, addr =%p , len = %d,errno = %d\n",
+                __func__,
+                __LINE__,
+                addr,
+                len,
+                errno);
         munmap(addr, len);
         return NULL;
     }
@@ -260,19 +266,56 @@ static inline void *mem_protect(void *const addr, const size_t len)
 
 static inline void *mmap_phy_addr(const int fd,
                                   const uint64_t phy_addr,
-                                  const size_t len)
+                                  const size_t len,
+                                  const uint32_t alignment)
 {
-    void *addr = NULL;
 
-    addr = qae_mmap(NULL,
+    void *addr = NULL;
+    void *addr_aligned = NULL;
+
+    if (alignment > (uint32_t)getpagesize()) {
+        // get an aligned addr
+        addr = qae_mmap(NULL,
+                    len + alignment,
+                    PROT_READ|PROT_WRITE,
+                    MAP_PRIVATE|MAP_ANONYMOUS,
+                    -1,
+                    0);
+        if (MAP_FAILED == addr) {
+            CMD_ERROR("%s:%d mmap failed to unaligned addr, len = %d, alignment = %d, errno = %d\n",
+                  __func__,
+                  __LINE__,
+                  len,
+                  alignment,
+                  errno);
+            return NULL;
+        }
+
+        addr_aligned = (void *)(((uint64_t)addr + alignment - 1) & ~((uint64_t)alignment - 1));
+        qae_munmap(addr, len + alignment);
+    }
+
+    int flags = MAP_SHARED | MAP_LOCKED;
+    if (addr_aligned) {
+        flags |= MAP_FIXED_NOREPLACE;
+    }
+    addr = qae_mmap(addr_aligned,
                     len,
                     PROT_READ | PROT_WRITE,
-                    MAP_SHARED | MAP_LOCKED,
+                    flags,
                     fd,
                     phy_addr);
 
-    if (MAP_FAILED == addr)
-        return NULL;
+    if (MAP_FAILED == addr) {
+            CMD_ERROR("%s:%d mmap failed to aligned addr = %p, len = %d, alignment = %d, errno = %d\n",
+                  __func__,
+                  __LINE__,
+                  addr_aligned,
+                  len,
+                  alignment,
+                  errno);
+            return NULL;
+    }
 
     addr = mem_protect(addr, len);
 
@@ -286,7 +329,6 @@ static inline dev_mem_info_t *ioctl_alloc_slab(const int fd,
                                                const int node,
                                                enum slabType type)
 {
-    UNUSED(alignment);
     dev_mem_info_t params = { 0 };
     int ret = 0;
     dev_mem_info_t *slab = NULL;
@@ -311,9 +353,9 @@ static inline dev_mem_info_t *ioctl_alloc_slab(const int fd,
     }
 
     if (SMALL == type)
-        slab = mmap_phy_addr(fd, params.phy_addr, params.size);
+        slab = mmap_phy_addr(fd, params.phy_addr, params.size, alignment);
     else
-        slab = mmap_phy_addr(fd, params.phy_addr, getpagesize());
+        slab = mmap_phy_addr(fd, params.phy_addr, getpagesize(), getpagesize());
 
     if (NULL == slab)
     {
@@ -335,7 +377,7 @@ static inline dev_mem_info_t *ioctl_alloc_slab(const int fd,
         slab->virt_addr = slab;
     else
     {
-        slab->virt_addr = mmap_phy_addr(fd, params.phy_addr, params.size);
+        slab->virt_addr = mmap_phy_addr(fd, params.phy_addr, params.size, alignment);
 
         if (NULL == slab->virt_addr)
         {
@@ -389,7 +431,6 @@ static inline dev_mem_info_t *ioctl_alloc_slab(const int fd,
                                                enum slabType type,
                                                qae_mem_info_t *tls_ptr)
 {
-    UNUSED(alignment);
     dev_mem_info_t params = { 0 };
     int ret = 0;
     dev_mem_info_t *slab = NULL;
@@ -414,9 +455,9 @@ static inline dev_mem_info_t *ioctl_alloc_slab(const int fd,
     }
 
     if (SMALL == type)
-        slab = mmap_phy_addr(fd, params.phy_addr, params.size);
+        slab = mmap_phy_addr(fd, params.phy_addr, params.size, alignment);
     else
-        slab = mmap_phy_addr(fd, params.phy_addr, getpagesize());
+        slab = mmap_phy_addr(fd, params.phy_addr, getpagesize(), getpagesize());
 
     if (NULL == slab)
     {
@@ -438,7 +479,7 @@ static inline dev_mem_info_t *ioctl_alloc_slab(const int fd,
         slab->virt_addr = slab;
     else
     {
-        slab->virt_addr = mmap_phy_addr(fd, params.phy_addr, params.size);
+        slab->virt_addr = mmap_phy_addr(fd, params.phy_addr, params.size, alignment);
 
         if (NULL == slab->virt_addr)
         {

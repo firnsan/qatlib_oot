@@ -430,6 +430,40 @@ void *__qae_alloc_addr(size_t size,
     if (0 != __qae_open())
         return NULL;
 
+
+    if (size > QAE_MAX_ALLOC_SIZE && !__qae_hugepage_enabled())
+    {
+#ifdef USE_VFIO_MAX_ALLOC_SIZE
+        CMD_ERROR(
+            "%s:%d Size cannot exceed 64M for vfio\n", __func__, __LINE__);
+#else
+        CMD_ERROR("%s:%d Size cannot exceed 4M for uio\n", __func__, __LINE__);
+#endif
+        return NULL;
+    }
+
+    if (!phys_alignment_byte ||
+        (phys_alignment_byte & (phys_alignment_byte - 1)))
+    {
+        CMD_ERROR("%s:%d Invalid alignment parameter %zu. It must be non zero, "
+                  "and multiple of 2 \n",
+                  __func__,
+                  __LINE__,
+                  phys_alignment_byte);
+        return NULL;
+    }
+
+    if (phys_alignment_byte > QAE_MAX_PHYS_ALIGN && !__qae_hugepage_enabled()) 
+    {
+            CMD_ERROR("%s:%d Invalid alignment parameter %zu. It must be non zero, "
+                "not more than %llu and multiple of 2 \n",
+                __func__,
+                __LINE__,
+                phys_alignment_byte,
+                QAE_MAX_PHYS_ALIGN);
+        return NULL;
+    }
+
     if (requested_pages > QAE_NUM_PAGES_PER_ALLOC * QAE_PAGE_SIZE / UNIT_SIZE ||
         phys_alignment_byte >= QAE_NUM_PAGES_PER_ALLOC * QAE_PAGE_SIZE)
     {
@@ -524,29 +558,6 @@ void *qaeMemAllocNUMA(size_t size, int node, size_t phys_alignment_byte)
     if (!size)
     {
         CMD_ERROR("%s:%d Size cannot be zero \n", __func__, __LINE__);
-        return NULL;
-    }
-
-    if (size > QAE_MAX_ALLOC_SIZE)
-    {
-#ifdef USE_VFIO_MAX_ALLOC_SIZE
-        CMD_ERROR(
-            "%s:%d Size cannot exceed 64M for vfio\n", __func__, __LINE__);
-#else
-        CMD_ERROR("%s:%d Size cannot exceed 4M for uio\n", __func__, __LINE__);
-#endif
-        return NULL;
-    }
-
-    if (!phys_alignment_byte || phys_alignment_byte > QAE_MAX_PHYS_ALIGN ||
-        (phys_alignment_byte & (phys_alignment_byte - 1)))
-    {
-        CMD_ERROR("%s:%d Invalid alignment parameter %zu. It must be non zero, "
-                  "not more than %llu and multiple of 2 \n",
-                  __func__,
-                  __LINE__,
-                  phys_alignment_byte,
-                  QAE_MAX_PHYS_ALIGN);
         return NULL;
     }
 

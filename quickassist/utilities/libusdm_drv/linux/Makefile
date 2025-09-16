@@ -139,6 +139,10 @@ ifeq ($(ICP_THREAD_SPECIFIC_USDM), 1)
 EXTRA_CFLAGS += -DICP_THREAD_SPECIFIC_USDM
 endif
 
+ifeq ($(ENSURE_HUGE_PAGE), 1)
+EXTRA_CFLAGS += -DENSURE_HUGE_PAGE
+endif
+
 ifeq ($(ICP_OS_LEVEL),user_space)
 EXTRA_CFLAGS += -DUSER_SPACE
 EXTRA_CFLAGS += -Wextra -Werror -Wno-missing-field-initializers

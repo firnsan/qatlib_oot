@@ -75,6 +75,7 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <linux/mman.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <unistd.h>
@@ -155,7 +156,7 @@ void *__qae_hugepage_mmap_phy_addr(const size_t len)
     addr = qae_mmap(NULL,
                     len,
                     PROT_READ | PROT_WRITE,
-                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE | MAP_HUGETLB,
+                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE | MAP_HUGETLB | MAP_HUGE_1GB,
                     hpg_fd,
                     0);
 
@@ -265,7 +266,7 @@ API_LOCAL
 int __qae_init_hugepages(const int fd)
 {
     int ret = 0;
-#if (QAE_NUM_PAGES_PER_ALLOC == 512)
+#if (QAE_NUM_PAGES_PER_ALLOC == HUGE_PAGE_SIZE / QAE_PAGE_SIZE)
     if (fd <= 0)
         return -EIO;
 
@@ -290,6 +291,13 @@ int __qae_init_hugepages(const int fd)
     }
     else
     {
+#ifdef ENSURE_HUGE_PAGE
+        CMD_ERROR("%s:%d please config usdm to use hugepage of size %lu\n",
+            __func__,
+            __LINE__,
+            HUGE_PAGE_SIZE);
+            ret = -EINVAL;
+#endif
         __qae_set_free_page_table_fptr(free_page_table);
         __qae_set_loadaddr_fptr(load_addr);
         __qae_set_loadkey_fptr(load_key);

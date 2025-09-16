@@ -93,10 +93,12 @@
 #define QAE_PAGE_SHIFT 12
 #define QAE_PAGE_SIZE (1UL << QAE_PAGE_SHIFT)
 
+
+#define HUGE_PAGE_SIZE (1024UL * 1024 * 1024)
 /* QAE_NUM_PAGES_PER_ALLOC can be defined as 32 pages when library
 is built, default is 512 */
 #ifndef QAE_NUM_PAGES_PER_ALLOC
-#define QAE_NUM_PAGES_PER_ALLOC 512
+#define QAE_NUM_PAGES_PER_ALLOC (HUGE_PAGE_SIZE / QAE_PAGE_SIZE)
 #endif
 
 #define STATIC static
